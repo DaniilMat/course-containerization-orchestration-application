@@ -1,0 +1,65 @@
+services:
+  db:
+    image: postgres:15
+    container_name: matveev-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${PG_PORT}:5432"
+    volumes:
+      - matveev-pgdata:/var/lib/postgresql/data
+    networks:
+      - matveev-backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: matveev-redis
+    ports:
+      - "${REDIS_PORT}:6379"
+    networks:
+      - matveev-backend
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  app:
+    build: .
+    container_name: matveev-assistant
+    ports:
+      - "${APP_PORT}:${APP_PORT}"
+    environment:
+      PORT: ${APP_PORT}
+      APP_OWNER: ${APP_OWNER}
+      APP_SECRET: ${APP_SECRET}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379/0
+      CACHE_TTL: ${CACHE_TTL}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - matveev-backend
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import os,urllib.request as u; u.urlopen('http://localhost:%s/health' % os.environ['PORT'], timeout=3)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  matveev-pgdata:
+
+networks:
+  matveev-backend:
+    driver: bridge
