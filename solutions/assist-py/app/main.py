@@ -1,15 +1,20 @@
 from contextlib import asynccontextmanager, closing
+import json
 import os
 import time
 
 import httpx
 import psycopg2
+import redis
 from fastapi import FastAPI
 from pydantic import BaseModel
 
 OWNER = os.getenv("APP_OWNER", "anonymous")
 SECRET_KEY = os.getenv("APP_SECRET", "default_secret")
 DATABASE_URL = os.getenv("DATABASE_URL")
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+CACHE_TTL = int(os.getenv("CACHE_TTL", "120"))
+redis_client = redis.from_url(REDIS_URL, decode_responses=True)
 
 
 def db_exec(query, params=None, fetch=False):
@@ -21,7 +26,6 @@ def db_exec(query, params=None, fetch=False):
 
 
 def init_db():
-    # БД может подняться позже приложения, поэтому несколько попыток
     for _ in range(10):
         try:
             db_exec(
@@ -52,7 +56,7 @@ async def root():
         "message": f"👋 Привет, {OWNER}!",
         "service": "personal-assistant",
         "version": "1.0",
-        "endpoints": ["/me", "/notes", "/weather/{city}", "/secret/{key}"],
+        "endpoints": ["/me", "/notes", "/weather/{city}", "/cache/stats", "/secret/{key}"],
     }
 
 
@@ -107,6 +111,15 @@ WEATHER_CODES: dict[int, str] = {
 
 @app.get("/weather/{city}")
 async def weather(city: str):
+    cache_key = f"weather:{OWNER}:{city.lower()}"
+
+    # Проверяем кэш
+    cached = redis_client.get(cache_key)
+    if cached:
+        data = json.loads(cached)
+        data["source"] = "cache"
+        return data
+
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             geo_resp = await client.get(
@@ -133,10 +146,9 @@ async def weather(city: str):
                 },
             )
             weather_data = weather_resp.json()["current"]
-
             code = weather_data.get("weather_code", -1)
 
-            return {
+            result = {
                 "city": city_name,
                 "country": country,
                 "coordinates": {"lat": lat, "lon": lon},
@@ -144,9 +156,26 @@ async def weather(city: str):
                 "humidity_pct": weather_data["relative_humidity_2m"],
                 "wind_km_h": weather_data["wind_speed_10m"],
                 "condition": WEATHER_CODES.get(code, f"Code {code}"),
+                "source": "api",
             }
     except Exception as e:
+        # ошибки внешнего API в кэш не кладём
         return {"error": f"Failed to get weather: {type(e).__name__}: {e}"}
+
+    # Сохраняем в кэш
+    redis_client.setex(cache_key, CACHE_TTL, json.dumps(result))
+    return result
+
+
+@app.get("/cache/stats")
+async def cache_stats():
+    keys = redis_client.keys(f"weather:{OWNER}:*")
+    return {
+        "owner": OWNER,
+        "ttl_seconds": CACHE_TTL,
+        "cached_count": len(keys),
+        "cached_cities": sorted(k.split(":")[-1] for k in keys),
+    }
 
 
 @app.post("/notes")
