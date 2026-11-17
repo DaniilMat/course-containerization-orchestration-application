@@ -1,0 +1,102 @@
+% Замените поясняющий текст собственными результатами.
+% В шаблоне нет готового решения и обязательных внешних изображений.
+\reportelement{Введение}
+
+Целью работы является перенос запуска приложения, PostgreSQL и Redis в Docker Compose и проба масштабирования; персональные параметры указаны в таблице~\ref{tab:parameters}.
+
+\begin{table}[H]
+  \caption{Персональные параметры}\label{tab:parameters}
+  \centering
+  \begin{tabularx}{\textwidth}{|p{0.46\textwidth}|X|}
+    \hline
+    Параметр & Значение\\ \hline
+    Номер ИСУ & \StudentISU\\ \hline
+    Персональный порт (PostgreSQL) & 5489\\ \hline
+    Персональный порт (Redis) & 6429\\ \hline
+    Персональный порт (приложение-ассистент) & 8059\\ \hline
+    Персональный префикс & matveev\\ \hline
+    Секретный ключ & secret59matveev\\ \hline
+    Имя базы данных & matveev59\\ \hline
+  \end{tabularx}
+\end{table}
+
+Результат хранится в ветке \texttt{lab-\LabNumber} форка:
+\url{\RepositoryURL}. 
+
+\chapter{Ход выполнения}
+\section{Подготовка проекта для Docker Compose}
+
+В корне проекта создал файл .env. Он будет содержать все персональные переменные, которые docker-compose подставит в сервисы автоматически. Он изображен на рисунке~\ref{fig:1}.
+
+\reportscreenshot{Screenshot_1.png}{Файл}{fig:1}
+
+Создал файл docker-compose.yml в корне проекта, изображенный на рисунке~\ref{fig:2}. На данном этапе описаны два сервиса: PostgreSQL (db) и приложение (app). Использованы переменные из .env.
+
+\reportscreenshot{Screenshot_2.png}{Файл}{fig:2}
+
+Запустил все сервисы и убедился, что оба контейнера запущены и приложение отвечает на рисунке~\ref{fig:3}.
+
+\reportscreenshot{Screenshot_3.png}{Проверка}{fig:3}
+
+\section{Добавление Redis для кэширования погоды}
+
+Добавил новый сервис redis в docker-compose.yml. Добавил зависимость app от Redis. Новый файл изображен на рисунках~\ref{fig:4} и~\ref{fig:5}.
+
+\reportscreenshot{Screenshot_4.png}{Файл}{fig:4}
+\reportscreenshot{Screenshot_5.png}{Файл}{fig:5}
+
+Интегрировал в main.py redis, добавлен эндпоинт /weather/{city}, имеет логику кэширования, добавлен эндпоинт /cache/stats. Новый код изображен на рисунках~\ref{fig:6},~\ref{fig:7} и~\ref{fig:8}.
+
+\reportscreenshot{Screenshot_6.png}{Файл}{fig:6}
+\reportscreenshot{Screenshot_7.png}{Файл}{fig:7}
+\reportscreenshot{Screenshot_8.png}{Файл}{fig:8}
+
+\section{Запуск и проверка полного стека}
+
+Пересобрал и запустил все сервисы. Проверил порядок запуска на рисунке~\ref{fig:9}.
+
+\reportscreenshot{Screenshot_9.png}{Проверка}{fig:9}
+
+Проверил работу кэширования на рисунке~\ref{fig:10}.
+
+\reportscreenshot{Screenshot_10.png}{Проверка}{fig:10}
+
+Исследовал networks и volumes на рисунке~\ref{fig:11}.
+
+\reportscreenshot{Screenshot_11.png}{Команды и выводы}{fig:11}
+
+\section{Масштабирование сервиса}
+
+Создал отдельный файл docker-compose.scale.yml. Для масштабирования убрал \texttt{container-name} у app и изменил порт на диапазон. Файл изображен на рисунке~\ref{fig:12}.
+
+\reportscreenshot{Screenshot_12.png}{Код}{fig:12}
+
+Запустил с масштабированием (3 экземпляра app) и проверил на рисунке~\ref{fig:13}.
+
+\reportscreenshot{Screenshot_13.png}{Проверка}{fig:13}
+
+Проверил работу масштабированных экземпляров на рисунке~\ref{fig:14}.
+
+\reportscreenshot{Screenshot_14.png}{Проверка}{fig:14}
+
+\section{Финальный артефакт}
+
+Финайльный артефакт изображен на рисунке~\ref{fig:15}.
+
+\reportscreenshot{Screenshot_15.png}{Артефакт}{fig:15}
+
+\reportelement{Заключение}
+
+В ходе выполнения лабораторной работы №4 были изучены возможности Docker Compose для оркестрации многоконтейнерных приложений. Была создана конфигурация, обеспечивающая совместную работу приложения, базы данных PostgreSQL и Redis.
+
+В процессе работы была реализована интеграция Redis для кэширования результатов запросов о погоде и зависимости между сервисами (depends-on). Также было выполнено масштабирование приложения до трёх экземпляров и проверена их совместная работа с общей базой данных и кэшем.
+
+
+% Оставьте только использованные источники и цитируйте их в тексте.
+\begin{thebibliography}{9}
+  \bibitem{docker-docs}
+  Docker Documentation: документация Docker.
+  URL: \url{https://docs.docker.com/}
+  (дата обращения: укажите свою дату).
+\end{thebibliography}
+
