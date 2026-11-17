@@ -47,3 +47,22 @@ docker run -d --name matveev-assistant --network matveev-backend -p 8059:8059 \
   -e DATABASE_URL="postgresql://<пользователь>:<пароль>@matveev-postgres:5432/<база>" \
   -v "$(pwd)/config":/app/config:ro matveev-assistant:v3
 ```
+
+## Docker Compose
+
+Стек из трёх сервисов: приложение `app` (FastAPI), PostgreSQL `db` и Redis `redis` (кэш погоды). Переменные берутся из `.env` (образец: `.env.example`).
+
+```bash
+cp .env.example .env   # заполните своими значениями
+docker compose up -d --build
+```
+
+Порты: приложение `APP_PORT`, PostgreSQL `PG_PORT`, Redis `REDIS_PORT`. Данные БД хранятся в volume `matveev-pgdata`, сервисы связаны сетью `matveev-backend`.
+
+Масштабирование приложения (хостовые порты назначаются случайно):
+
+```bash
+docker compose down
+docker compose -f docker-compose.scale.yml up -d --build --scale app=3
+docker compose -f docker-compose.scale.yml ps
+```
